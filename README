@@ -1,0 +1,176 @@
+# Agente de Reembolsos
+
+Sistema de automatización inteligente que recibe fotos de facturas y tirillas por Telegram, extrae los datos automáticamente usando GPT Vision, y genera el Excel mensual de reembolsos listo para entregar a la empresa.
+
+---
+
+## Problema que resuelve
+
+El proceso manual de reembolsos requiere revisar tirilla por tirilla, transcribir proveedor, NIT, fecha, detalle y valor al Excel de control, y hacerlo todo a fin de mes cuando muchas facturas ya se han perdido u olvidado.
+
+Este agente elimina ese proceso: en el momento que recibes una tirilla, la fotografías y se la mandas al bot. Él extrae los datos, te confirma la información, pregunta a qué obra corresponde, y la guarda. A fin de mes escribes `/reporte MM AAAA` y recibes el Excel completo listo para entregar.
+
+```
+Antes: acumular tirillas → buscarlas a fin de mes → transcribir una por una → Excel
+Después: foto al bot → confirmar → fin de mes el Excel llega por Telegram
+```
+
+---
+
+## Funcionalidades
+
+- **Lectura de tirillas por foto** — GPT Vision extrae proveedor, NIT, fecha, detalle y valor de cualquier formato de factura
+- **Flujo conversacional** — el bot pregunta si es Contable o No Contable y a qué obra corresponde
+- **Validación de entrada** — rechaza respuestas inválidas y guía al usuario
+- **Almacenamiento persistente** — base de datos SQLite que conserva los registros entre sesiones
+- **Generación de reporte mensual** — comando `/reporte MM AAAA` genera el Excel con las dos tablas separadas (Contables y No Contables) listas para entregar
+- **Envío por Telegram** — el Excel llega directamente al celular sin buscar archivos
+
+---
+
+## Arquitectura
+
+```
+Foto de tirilla (Telegram)
+        ↓
+bot/telegram_bot.py — recibe imagen y maneja conversación
+        ↓
+vision/extractor.py — GPT Vision extrae datos estructurados
+        ↓
+database/operaciones.py — guarda en SQLite
+        ↓
+/reporte MM AAAA
+        ↓
+reportes/generador_excel.py — genera Excel con formato empresa
+        ↓
+Excel por Telegram ✅
+```
+
+---
+
+## Estructura del proyecto
+
+```
+AGENTE_REEMBOLSOS/
+│
+├── main.py                        ← punto de entrada
+│
+├── bot/
+│   └── telegram_bot.py            ← recibe mensajes y maneja estados
+│
+├── vision/
+│   └── extractor.py               ← lectura de tirillas con GPT Vision
+│
+├── database/
+│   ├── modelos.py                 ← crea la base de datos
+│   └── operaciones.py             ← guarda y consulta registros
+│
+├── reportes/
+│   └── generador_excel.py         ← genera el Excel mensual
+│
+├── .env.example                   ← plantilla de configuración
+├── .gitignore
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Stack tecnológico
+
+| Herramienta | Uso |
+|---|---|
+| Python 3.12 | Lenguaje principal |
+| OpenAI API (GPT-4o Vision) | Extracción de datos desde imágenes |
+| python-telegram-bot | Interfaz de mensajería |
+| SQLite | Base de datos local persistente |
+| openpyxl | Generación del Excel de reembolsos |
+| python-dotenv | Gestión de variables de entorno |
+
+---
+
+## Instalación
+
+### Requisitos
+
+- Python 3.10+
+- Token de Telegram Bot 
+- API Key de OpenAI
+- Archivo Excel de reembolsos con el formato de tu empresa
+
+### Pasos
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/CristianCRN/AGENTE_REEMBOLSOS.git
+cd AGENTE_REEMBOLSOS
+
+# 2. Crear entorno virtual
+python -m venv venv
+
+# 3. Activar entorno virtual
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Linux/Mac
+
+# 4. Instalar dependencias
+pip install -r requirements.txt
+
+# 5. Configurar variables de entorno
+# Copia .env.example como .env y completa los valores
+cp .env.example .env
+```
+
+### Configuración del `.env`
+
+```env
+TELEGRAM_TOKEN=tu_token_de_telegram
+OPENAI_API_KEY=tu_api_key_de_openai
+```
+
+### Configurar el Excel
+
+Coloca tu archivo Excel de reembolsos en la raíz del proyecto con el nombre `Reembolsos.xlsx`. El archivo debe tener la estructura de tu empresa con las tablas de Contables y No Contables.
+
+---
+
+## Uso
+
+```bash
+# 1. Inicializar la base de datos (solo la primera vez)
+python database/modelos.py
+
+# 2. Arrancar el bot
+python main.py
+```
+
+### Comandos disponibles
+
+| Comando | Descripción |
+|---|---|
+| `/start` | Inicia el bot |
+| `/reporte MM AAAA` | Genera el Excel del mes indicado |
+
+### Flujo de registro
+
+1. Toma foto de la tirilla y mándala al bot por Telegram
+2. El bot extrae los datos y te muestra el resumen
+3. Responde `Contable` o `No Contable`
+4. Responde el nombre de la obra
+5. El bot confirma que el gasto quedó registrado
+
+### Generación del reporte
+
+```
+/reporte 07 2026
+```
+
+El bot responde con el archivo Excel del mes listo para entregar.
+
+---
+
+## Autor
+
+**Cristian David López González**
+Ingeniero Electrónico | Especialista en IA
+
+[LinkedIn](https://www.linkedin.com/in/cristianlopez-7181a6239) · [GitHub](https://github.com/CristianCRN)
