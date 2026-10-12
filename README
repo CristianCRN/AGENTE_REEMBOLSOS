@@ -25,6 +25,7 @@ Después: foto al bot → confirmar → fin de mes el Excel llega por Telegram
 - **Almacenamiento persistente** — base de datos SQLite que conserva los registros entre sesiones
 - **Generación de reporte mensual** — comando `/reporte MM AAAA` genera el Excel con las dos tablas separadas (Contables y No Contables) listas para entregar
 - **Envío por Telegram** — el Excel llega directamente al celular sin buscar archivos
+- **Validación de fecha** — rechaza facturas con fecha fuera del rango esperado (mes actual o el inmediatamente anterior) y le pide al usuario una foto más clara o la fecha escrita a mano, en vez de guardar un dato que podría estar mal.
 
 ---
 
@@ -45,6 +46,18 @@ reportes/generador_excel.py — genera Excel con formato empresa
         ↓
 Excel por Telegram ✅
 ```
+---
+
+## Decisiones técnicas
+
+**Problema detectado:** al probar el agente con facturas reales, GPT-4o Vision fallaba en dos casos específicos: tirillas de "Zonas Azules" cuya fecha se indica raspando una casilla (no hay dígitos que leer), y recibos sin un campo "Total" explícito, donde el modelo tomaba el Subtotal en vez del valor con IVA incluido.
+
+**Decisión:** en vez de intentar que el modelo lea perfecto cualquier formato (poco realista con tirillas de raspe), se combinaron dos soluciones de bajo costo:
+
+- Ajuste de prompt: se le indica al modelo una jerarquía de búsqueda para el valor total (Total explícito → Subtotal + IVA → Recibido), y que priorice una fecha escrita a mano sobre cualquier cuadrícula de casillas marcadas.
+- Validación de rango de fecha en código (`fecha_en_rango_valido`): si la fecha extraída no cae en el mes actual o el anterior, el agente rechaza la factura y le pide al usuario una foto más clara, en vez de guardar un dato que podría estar mal.
+
+**Trade-off:** se prefirió rechazar y pedir de nuevo sobre guardar silenciosamente un dato dudoso — el costo es que a veces el usuario tiene que volver a tomar la foto o escribir la fecha a mano, pero se evita que datos financieros incorrectos lleguen al Excel de reembolsos sin que nadie se entere.
 
 ---
 
@@ -142,6 +155,17 @@ python database/modelos.py
 # 2. Arrancar el bot
 python main.py
 ```
+---
+
+## Tests
+
+El proyecto incluye tests automatizados con pytest sobre la lógica crítica de validación de facturas (estructura de datos y rango de fecha permitido):
+
+```bash
+pytest -v
+```
+
+Casos cubiertos: factura con datos correctos y fecha dentro del rango válido (mes actual o anterior), y rechazo de facturas con fecha fuera de ese rango.
 
 ### Comandos disponibles
 
@@ -169,7 +193,7 @@ El bot responde con el archivo Excel del mes listo para entregar.
 ---
 
 ## Autor
-
+pip
 **Cristian David López González**
 Ingeniero Electrónico | Especialista en IA
 

@@ -3,13 +3,14 @@ import json
 import base64
 import os
 from dotenv import load_dotenv
+from datetime import date, timedelta, datetime
 
 load_dotenv()
 
 # ── API ──
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
-CAMPOS_FACTURA = ["proveedor", "nit", "detalle", "valor"]
+CAMPOS_FACTURA = ["proveedor", "nit", "detalle", "valor", "fecha"]
 
 def leer_factura_tirilla(imagen_bytes):
     imagen = base64.b64encode(imagen_bytes).decode("utf-8")
@@ -24,9 +25,13 @@ def leer_factura_tirilla(imagen_bytes):
     }}
     OJO tener en cuanta que es posible que hayan muchos items, cada item debe de contener su valor, de resto todos comparten
     la empresa, el nit y la fecha, no inventes datos, ni trates de rellenar datos faltante, adicionalmente relaciona palabras, subtotal es igual a valor
-    Devuelve SOLO un objeto JSON plano con estos campos.
-    Si hay varios items, combina las descripciones en "detalle"
-    y suma los valores en "valor".
+    Devuelve SOLO un objeto JSON plano con estos campos, Si hay varios items, combina las descripciones en "detalle" y suma los valores en "valor".
+    Busca un campo que diga literlamente Total, Total a Pagar, Valor Total o Total Pagado, si este existe usa ese valor tal cual
+    Si no existe ese campo pero ves un valor que se llame Subtotal e IVA como lineas separadas, sumalos antes de guardar el valor
+    y el valor sumado es el que guardas,
+    si ves una fecha escrita a mano en formato DD/MM/AAAA en el documento, úsala como la fecha del gasto; ignora cualquier cuadrícula de casillas
+    marcadas o raspadas.
+    Ojo todas las facturas estan en pesos colombianos, para que no confundas el separador de miles como separador de decimal.
     """
     response = client.chat.completions.create(
         model = "gpt-4o",
@@ -44,7 +49,14 @@ def leer_factura_tirilla(imagen_bytes):
     #print ("Devolvio", respuesta)
     return  respuesta
 
-def validar_factura(datos):
+def fecha_en_rango_valido(fecha_factura, hoy=None):
+    hoy = hoy or date.today()
+    primer_dia_mes_actual = hoy.replace(day=1)
+    ultimo_dia_mes_anterior = primer_dia_mes_actual - timedelta(days=1)
+    primer_dia_mes_anterior = ultimo_dia_mes_anterior.replace(day=1)
+    return primer_dia_mes_anterior <= fecha_factura <= hoy
+   
+def validar_factura(datos, hoy=None):
     resultado = {k.lower(): v for k , v in json.loads(datos).items()}
     
     # Validar campos principales
@@ -55,5 +67,13 @@ def validar_factura(datos):
     # Validar que haya al menos un item
     if len(resultado["detalle"]) == 0:
         raise ValueError("La factura no tiene items")
+    
+    try:
+        fecha_factura = datetime.strptime(resultado["fecha"], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        raise ValueError("No se pudo verificar la fecha de la factura, por favor toma una fotografía en mejor calidad o escribe la fecha a mano en una esquina de la factura")
+    
+    if not fecha_en_rango_valido(fecha_factura, hoy):
+        raise ValueError("No se pudo verificar la fecha de la factura, por favor toma una fotografía en mejor calidad o escribe la fecha a mano en una esquina de la factura")
     
     return resultado
