@@ -13,7 +13,7 @@ def main():
 
     async def start(update, context):
         await update.message.reply_text(
-            "¡Hola! Soy Richard tu asistente personal. Cuéntame qué necesitas."
+            "¡Hola! Soy Nexa tu asistente de reembolsos. Cuéntame qué necesitas."
         )
 
     async def recibir_texto(update, context):
